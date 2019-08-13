@@ -13,28 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
-#include <sstream>
 #include <string>
 
 namespace android {
 namespace linkerconfig {
-namespace modules {
-
-class ConfigWriter {
- public:
-  void SetPrefix(const std::string& prefix);
-  void ResetPrefix();
-  void WriteLine(const std::string& line);
-  void WriteLine(const char* format, ...);
-  std::string ToString();
-
- private:
-  std::stringstream content_;
-  std::string prefix_;
-};
-
-}  // namespace modules
+namespace generator {
+std::string GetLibrariesString(std::string library_file_path);
+std::string GetPublicLibrariesString(std::string library_file_path,
+                                     std::string private_library_file_path);
+std::string GetPrivateLibrariesString(std::string library_file_path,
+                                      std::string private_library_file_path);
+}  // namespace generator
 }  // namespace linkerconfig
 }  // namespace android

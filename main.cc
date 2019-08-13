@@ -21,6 +21,7 @@
 #include <string>
 
 #include "linkerconfig/baseconfig.h"
+#include "linkerconfig/log.h"
 #include "linkerconfig/variableloader.h"
 
 namespace {
@@ -71,9 +72,23 @@ android::linkerconfig::modules::Configuration GetConfiguration() {
   // Use base configuration in default
   return android::linkerconfig::contents::CreateBaseConfiguration();
 }
+
+struct CombinedLogger {
+  android::base::LogdLogger logd;
+
+  void operator()(android::base::LogId id, android::base::LogSeverity severity,
+                  const char* tag, const char* file, unsigned int line,
+                  const char* message) {
+    logd(id, severity, tag, file, line, message);
+    KernelLogger(id, severity, tag, file, line, message);
+  }
+};
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  android::base::InitLogging(argv, CombinedLogger());
+
   ProgramArgs args;
 
   if (!ParseArgs(argc, argv, &args)) {
@@ -86,22 +101,20 @@ int main(int argc, char* argv[]) {
   if (args.target_file != "") {
     file_out.open(args.target_file);
     if (file_out.fail()) {
-      std::cerr << "Failed to open file " << args.target_file << " : "
-                << std::strerror(errno) << std::endl;
+      PLOG(FATAL) << "Failed to open file " << args.target_file;
       return EXIT_FAILURE;
     }
     out = &file_out;
   }
 
-  android::linkerconfig::generator::LoadVariable();
+  android::linkerconfig::generator::LoadVariables();
   auto config = GetConfiguration();
   android::linkerconfig::modules::ConfigWriter config_writer;
 
   config.WriteConfig(config_writer);
   *out << config_writer.ToString();
   if (!out->good()) {
-    std::cerr << "Failed to write content to " << args.target_file << " : "
-              << std::strerror(errno) << std::endl;
+    PLOG(FATAL) << "Failed to write content to " << args.target_file;
     return EXIT_FAILURE;
   }
 

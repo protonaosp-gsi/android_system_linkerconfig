@@ -26,11 +26,7 @@ class Variables {
  public:
   static std::optional<std::string> GetValue(const std::string& key);
   static void AddValue(const std::string& key, const std::string& value);
-
-  // Load multiple variables at a time
-  // This function will add multiple variables at a time. Any item with existing
-  // key will be ignored.
-  static void Load(std::map<std::string, std::string> predefined_variables);
+  static std::string ResolveVariables(const std::string& str);
 
  private:
   static std::map<std::string, std::string> variables_;
