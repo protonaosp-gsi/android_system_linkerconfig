@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "linkerconfig/legacy.h"
+#include "configurationtest.h"
+#include "linkerconfig/configwriter.h"
+#include "mockenv.h"
 
-#include <string>
+TEST(linkerconfig_configuration_fulltest, legacy_test) {
+  MockGenericVariables();
+  auto legacy_config =
+      android::linkerconfig::contents::CreateLegacyConfiguration();
+  android::linkerconfig::modules::ConfigWriter config_writer;
 
-namespace android {
-namespace linkerconfig {
-namespace generator {
+  legacy_config.WriteConfig(config_writer);
 
-void LoadVariables(const std::string& root);
-
-}  // namespace generator
-}  // namespace linkerconfig
-}  // namespace android
+  VerifyConfiguration(config_writer.ToString());
+}
