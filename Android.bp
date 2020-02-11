@@ -21,7 +21,9 @@ cc_defaults {
         "-Werror",
         "-Wextra",
     ],
+    defaults: ["libapexutil-deps"],
     static_libs: [
+        "libapexutil",
         "libbase",
         "liblog",
     ],
@@ -98,6 +100,7 @@ cc_test {
         "modules/tests/*_test.cc",
     ],
     static_libs: [
+        "libgmock",
         "linkerconfig_modules",
     ],
 }
@@ -143,4 +146,19 @@ cc_test {
         "linkerconfig_modules",
         "linkerconfig_contents",
     ],
+}
+
+prebuilt_etc {
+    name: "ld.config.recovery.txt",
+    recovery: true,
+    filename: "ld.config.txt",
+    src: ":generate_recovery_linker_config",
+}
+
+genrule {
+    name: "generate_recovery_linker_config",
+    recovery: true,
+    out: ["ld.config.txt"],
+    tools: ["linkerconfig"],
+    cmd: "$(location linkerconfig) --recovery --target $(genDir)",
 }

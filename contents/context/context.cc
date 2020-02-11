@@ -16,44 +16,77 @@
 
 #include "linkerconfig/context.h"
 
+#include "linkerconfig/namespacebuilder.h"
+
+using android::linkerconfig::modules::ApexInfo;
+using android::linkerconfig::modules::Namespace;
+
 namespace android {
 namespace linkerconfig {
 namespace contents {
+
 bool Context::IsSystemSection() const {
-  return current_section == SectionType::System;
+  return current_section_ == SectionType::System;
 }
 
 bool Context::IsVendorSection() const {
-  return current_section == SectionType::Vendor;
+  return current_section_ == SectionType::Vendor;
+}
+
+bool Context::IsProductSection() const {
+  return current_section_ == SectionType::Product;
 }
 
 bool Context::IsDefaultConfig() const {
-  return current_linkerconfig_type == LinkerConfigType::Default;
+  return current_linkerconfig_type_ == LinkerConfigType::Default;
 }
 
 bool Context::IsLegacyConfig() const {
-  return current_linkerconfig_type == LinkerConfigType::Legacy;
+  return current_linkerconfig_type_ == LinkerConfigType::Legacy;
 }
 
 bool Context::IsVndkliteConfig() const {
-  return current_linkerconfig_type == LinkerConfigType::Vndklite;
+  return current_linkerconfig_type_ == LinkerConfigType::Vndklite;
 }
 
 bool Context::IsRecoveryConfig() const {
-  return current_linkerconfig_type == LinkerConfigType::Recovery;
+  return current_linkerconfig_type_ == LinkerConfigType::Recovery;
+}
+
+bool Context::IsApexBinaryConfig() const {
+  return current_linkerconfig_type_ == LinkerConfigType::ApexBinary;
 }
 
 void Context::SetCurrentSection(SectionType section_type) {
-  current_section = section_type;
+  current_section_ = section_type;
 }
 
 std::string Context::GetSystemNamespaceName() const {
-  return IsVendorSection() && !IsVndkliteConfig() ? "system" : "default";
+  return (IsVendorSection() || IsProductSection() || IsApexBinaryConfig()) &&
+                 !IsVndkliteConfig()
+             ? "system"
+             : "default";
 }
 
 void Context::SetCurrentLinkerConfigType(LinkerConfigType config_type) {
-  current_linkerconfig_type = config_type;
+  current_linkerconfig_type_ = config_type;
 }
+
+void Context::RegisterApexNamespaceBuilder(const std::string& name,
+                                           ApexNamespaceBuilder builder) {
+  builders_[name] = builder;
+}
+
+Namespace Context::BuildApexNamespace(const ApexInfo& apex_info,
+                                      bool visible) const {
+  auto builder = builders_.find(apex_info.name);
+  if (builder != builders_.end()) {
+    return builder->second(*this, apex_info);
+  }
+
+  return BaseContext::BuildApexNamespace(apex_info, visible);
+}
+
 }  // namespace contents
 }  // namespace linkerconfig
 }  // namespace android

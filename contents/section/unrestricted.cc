@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+// Linker config for native tests that need access to both system and vendor
+// libraries. This replicates the default linker config (done by
+// init_default_namespace_no_config in bionic/linker/linker.cpp), except that it
+// includes the requisite namespace setup for APEXes.
+
 #include "linkerconfig/sectionbuilder.h"
 
 #include "linkerconfig/common.h"
@@ -33,15 +38,18 @@ Section BuildUnrestrictedSection(Context& ctx) {
   std::vector<Namespace> namespaces;
 
   namespaces.emplace_back(BuildUnrestrictedDefaultNamespace(ctx));
-  namespaces.emplace_back(BuildArtNamespace(ctx));
-  namespaces.emplace_back(BuildMediaNamespace(ctx));
-  namespaces.emplace_back(BuildConscryptNamespace(ctx));
-  namespaces.emplace_back(BuildResolvNamespace(ctx));
-  namespaces.emplace_back(BuildNeuralNetworksNamespace(ctx));
 
-  Section section("unrestricted", std::move(namespaces));
-  AddStandardSystemLinks(ctx, &section);
-  return section;
+  return BuildSection(ctx,
+                      "unrestricted",
+                      std::move(namespaces),
+                      {
+                          "com.android.art",
+                          "com.android.neuralnetworks",
+                          "com.android.runtime",
+                          "com.android.cronet",
+                          "com.android.media",
+                          "com.android.conscrypt",
+                      });
 }
 }  // namespace contents
 }  // namespace linkerconfig

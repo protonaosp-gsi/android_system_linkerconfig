@@ -15,29 +15,38 @@
  */
 #pragma once
 
+#include "linkerconfig/apex.h"
 #include "linkerconfig/context.h"
 #include "linkerconfig/namespace.h"
-
-typedef android::linkerconfig::modules::Namespace NamespaceBuilder(
-    const android::linkerconfig::contents::Context& ctx);
 
 namespace android {
 namespace linkerconfig {
 namespace contents {
+
+typedef modules::Namespace NamespaceBuilder(const Context& ctx);
+
 NamespaceBuilder BuildSystemDefaultNamespace;
-NamespaceBuilder BuildMediaNamespace;
-NamespaceBuilder BuildArtNamespace;
-NamespaceBuilder BuildConscryptNamespace;
-NamespaceBuilder BuildResolvNamespace;
 NamespaceBuilder BuildSphalNamespace;
 NamespaceBuilder BuildRsNamespace;
 NamespaceBuilder BuildVndkNamespace;
 NamespaceBuilder BuildVendorDefaultNamespace;
 NamespaceBuilder BuildSystemNamespace;
 NamespaceBuilder BuildVndkInSystemNamespace;
+NamespaceBuilder BuildProductDefaultNamespace;
 NamespaceBuilder BuildUnrestrictedDefaultNamespace;
 NamespaceBuilder BuildPostInstallNamespace;
-NamespaceBuilder BuildNeuralNetworksNamespace;
+NamespaceBuilder BuildRecoveryDefaultNamespace;
+
+modules::Namespace BuildArtNamespace(const Context& ctx,
+                                     const modules::ApexInfo& apex_info);
+
+// Namespaces for APEX binaries
+modules::Namespace BuildApexDefaultNamespace(const Context& ctx,
+                                             const modules::ApexInfo& apex_info);
+NamespaceBuilder BuildApexPlatformNamespace;
+NamespaceBuilder BuildApexArtDefaultNamespace;
+
+void RegisterApexNamespaceBuilders(Context& ctx);
 }  // namespace contents
 }  // namespace linkerconfig
 }  // namespace android

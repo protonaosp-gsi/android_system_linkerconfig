@@ -16,26 +16,12 @@
 
 #include "linkerconfig/namespacebuilder.h"
 
+#include "linkerconfig/common.h"
 #include "linkerconfig/environment.h"
 #include "linkerconfig/namespace.h"
 
 using android::linkerconfig::modules::AsanPath;
 using android::linkerconfig::modules::Namespace;
-
-namespace {
-const std::vector<std::string> kLibsFromArt = {
-    "libdexfile_external.so",
-    "libdexfiled_external.so",
-    "libnativebridge.so",
-    "libnativehelper.so",
-    "libnativeloader.so",
-    "libandroidicu.so",
-    "libpac.so",
-    // TODO(b/120786417 or b/134659294): libicuuc.so and libicui18n.so are kept
-    // for app compat.
-    "libicui18n.so",
-    "libicuuc.so"};
-}  // namespace
 
 namespace android {
 namespace linkerconfig {
@@ -47,10 +33,27 @@ Namespace BuildUnrestrictedDefaultNamespace([[maybe_unused]] const Context& ctx)
   ns.AddSearchPath("/odm/${LIB}", AsanPath::WITH_DATA_ASAN);
   ns.AddSearchPath("/vendor/${LIB}", AsanPath::WITH_DATA_ASAN);
 
-  ns.GetLink("art").AddSharedLib(kLibsFromArt);
-  ns.GetLink("resolv").AddSharedLib("libnetd_resolv.so");
-  ns.GetLink("neuralnetworks").AddSharedLib("libneuralnetworks.so");
+  ns.AddRequires(std::vector{
+      // Keep in sync with the "platform" namespace in art/build/apex/ld.config.txt.
+      "libdexfile_external.so",
+      "libdexfiled_external.so",
+      "libnativebridge.so",
+      "libnativehelper.so",
+      "libnativeloader.so",
+      "libandroidicu.so",
+      // TODO(b/122876336): Remove libpac.so once it's migrated to Webview
+      "libpac.so",
+      // TODO(b/120786417 or b/134659294): libicuuc.so
+      // and libicui18n.so are kept for app compat.
+      "libicui18n.so",
+      "libicuuc.so",
+      // resolv
+      "libnetd_resolv.so",
+      // nn
+      "libneuralnetworks.so",
+  });
 
+  ns.AddProvides(GetSystemStubLibraries());
   return ns;
 }
 }  // namespace contents

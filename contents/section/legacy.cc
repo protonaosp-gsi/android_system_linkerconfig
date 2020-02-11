@@ -32,15 +32,18 @@ Section BuildLegacySection(Context& ctx) {
   std::vector<Namespace> namespaces;
 
   namespaces.emplace_back(BuildSystemDefaultNamespace(ctx));
-  namespaces.emplace_back(BuildArtNamespace(ctx));
-  namespaces.emplace_back(BuildMediaNamespace(ctx));
-  namespaces.emplace_back(BuildConscryptNamespace(ctx));
-  namespaces.emplace_back(BuildResolvNamespace(ctx));
-  namespaces.emplace_back(BuildNeuralNetworksNamespace(ctx));
 
-  Section section("legacy", std::move(namespaces));
-  AddStandardSystemLinks(ctx, &section);
-  return section;
+  return BuildSection(ctx,
+                      "legacy",
+                      std::move(namespaces),
+                      {
+                          "com.android.art",
+                          "com.android.neuralnetworks",
+                          "com.android.runtime",
+                          "com.android.cronet",
+                          "com.android.media",
+                          "com.android.conscrypt",
+                      });
 }
 }  // namespace contents
 }  // namespace linkerconfig

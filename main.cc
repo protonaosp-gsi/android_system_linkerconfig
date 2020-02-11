@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <android-base/result.h>
 #include <getopt.h>
 
 #include <cstring>
@@ -21,34 +21,60 @@
 #include <iostream>
 #include <string>
 
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include "linkerconfig/apex.h"
+#include "linkerconfig/apexconfig.h"
 #include "linkerconfig/baseconfig.h"
+#include "linkerconfig/context.h"
 #include "linkerconfig/environment.h"
 #include "linkerconfig/legacy.h"
 #include "linkerconfig/log.h"
+#include "linkerconfig/namespacebuilder.h"
+#include "linkerconfig/recovery.h"
 #include "linkerconfig/variableloader.h"
 #include "linkerconfig/variables.h"
+
+using android::base::ErrnoError;
+using android::base::Error;
+using android::base::Result;
+using android::linkerconfig::contents::Context;
+using android::linkerconfig::modules::ApexInfo;
+using android::linkerconfig::modules::Configuration;
 
 namespace {
 const static struct option program_options[] = {
     {"target", required_argument, 0, 't'},
-#ifndef __ANROID__
+    {"strict", no_argument, 0, 's'},
+#ifndef __ANDROID__
     {"root", required_argument, 0, 'r'},
     {"vndk", required_argument, 0, 'v'},
+    {"recovery", no_argument, 0, 'y'},
+    {"legacy", no_argument, 0, 'l'},
 #endif
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}};
 
 struct ProgramArgs {
-  std::string target_file;
+  std::string target_directory;
+  bool strict;
   std::string root;
   std::string vndk_version;
+  bool is_recovery;
+  bool is_legacy;
 };
 
 [[noreturn]] void PrintUsage(int status = EXIT_SUCCESS) {
-  std::cerr << "Usage : linkerconfig [--target <target_file>]"
+  std::cerr << "Usage : linkerconfig [--target <target_directory>]"
+               " [--strict]"
 #ifndef __ANDROID__
                " --root <root dir>"
                " --vndk <vndk version>"
+               " --recovery"
+               " --legacy"
 #endif
                " [--help]"
             << std::endl;
@@ -58,16 +84,25 @@ struct ProgramArgs {
 bool ParseArgs(int argc, char* argv[], ProgramArgs* args) {
   int parse_result;
   while ((parse_result = getopt_long(
-              argc, argv, "t:r:v:h", program_options, NULL)) != -1) {
+              argc, argv, "t:sr:v:hyl", program_options, NULL)) != -1) {
     switch (parse_result) {
       case 't':
-        args->target_file = optarg;
+        args->target_directory = optarg;
+        break;
+      case 's':
+        args->strict = true;
         break;
       case 'r':
         args->root = optarg;
         break;
       case 'v':
         args->vndk_version = optarg;
+        break;
+      case 'y':
+        args->is_recovery = true;
+        break;
+      case 'l':
+        args->is_legacy = true;
         break;
       case 'h':
         PrintUsage();
@@ -83,15 +118,155 @@ bool ParseArgs(int argc, char* argv[], ProgramArgs* args) {
   return true;
 }
 
-android::linkerconfig::modules::Configuration GetConfiguration() {
-  if (android::linkerconfig::modules::IsLegacyDevice()) {
-    return android::linkerconfig::contents::CreateLegacyConfiguration();
+void LoadVariables(ProgramArgs args) {
+#ifndef __ANDROID__
+  if (!args.is_recovery && (args.root == "" || args.vndk_version == "")) {
+    PrintUsage();
+  }
+  android::linkerconfig::modules::Variables::AddValue("ro.vndk.version",
+                                                      args.vndk_version);
+#endif
+
+  if (!args.is_recovery) {
+    android::linkerconfig::generator::LoadVariables(args.root);
+  }
+}
+
+Result<void> WriteConfigurationToFile(Configuration& conf,
+                                      std::string file_path) {
+  std::ostream* out = &std::cout;
+  std::ofstream file_out;
+
+  if (file_path != "") {
+    file_out.open(file_path);
+    if (file_out.fail()) {
+      return ErrnoError() << "Failed to open file " << file_path;
+    }
+    out = &file_out;
   }
 
-  // TODO : Use recovery if needed
+  android::linkerconfig::modules::ConfigWriter config_writer;
+
+  conf.WriteConfig(config_writer);
+  *out << config_writer.ToString();
+  if (!out->good()) {
+    return ErrnoError() << "Failed to write content to " << file_path;
+  }
+
+  return {};
+}
+
+Result<void> UpdatePermission([[maybe_unused]] const std::string& file_path) {
+#ifdef __ANDROID__
+  if (fchmodat(AT_FDCWD,
+               file_path.c_str(),
+               S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,
+               AT_SYMLINK_NOFOLLOW) < 0) {
+    return ErrnoError() << "Failed to update permission of " << file_path;
+  }
+#endif
+
+  return {};
+}
+
+Context GetContext(ProgramArgs args) {
+  const std::string apex_root = args.root + "/apex";
+  auto apex_list = android::linkerconfig::modules::ScanActiveApexes(apex_root);
+  Context ctx;
+  for (auto const& apex_item : apex_list) {
+    auto apex_info = apex_item.second;
+    if (apex_info.has_bin || apex_info.has_lib) {
+      ctx.AddApexModule(std::move(apex_info));
+    }
+  }
+  if (args.strict) {
+    ctx.SetStrictMode(true);
+  }
+  android::linkerconfig::contents::RegisterApexNamespaceBuilders(ctx);
+  return ctx;
+}
+
+Configuration GetConfiguration(Context& ctx) {
+  if (android::linkerconfig::modules::IsRecoveryMode()) {
+    return android::linkerconfig::contents::CreateRecoveryConfiguration(ctx);
+  }
+
+  if (android::linkerconfig::modules::IsLegacyDevice()) {
+    return android::linkerconfig::contents::CreateLegacyConfiguration(ctx);
+  }
 
   // Use base configuration in default
-  return android::linkerconfig::contents::CreateBaseConfiguration();
+  return android::linkerconfig::contents::CreateBaseConfiguration(ctx);
+}
+
+Result<void> GenerateConfiguration(Configuration config, std::string dir_path,
+                                   bool update_permission) {
+  std::string file_path = "";
+  if (dir_path != "") {
+    file_path = dir_path + "/ld.config.txt";
+  }
+
+  auto write_config = WriteConfigurationToFile(config, file_path);
+  if (!write_config.ok()) {
+    return write_config;
+  } else if (update_permission && file_path != "") {
+    return UpdatePermission(file_path);
+  }
+
+  return {};
+}
+
+Result<void> GenerateBaseLinkerConfiguration(Context& ctx,
+                                             const std::string& dir_path) {
+  return GenerateConfiguration(GetConfiguration(ctx), dir_path, true);
+}
+
+Result<void> GenerateRecoveryLinkerConfiguration(Context& ctx,
+                                                 const std::string& dir_path) {
+  return GenerateConfiguration(
+      android::linkerconfig::contents::CreateRecoveryConfiguration(ctx),
+      dir_path,
+      false);
+}
+
+Result<void> GenerateLegacyLinkerConfiguration(Context& ctx,
+                                               const std::string& dir_path) {
+  return GenerateConfiguration(
+      android::linkerconfig::contents::CreateLegacyConfiguration(ctx),
+      dir_path,
+      false);
+}
+
+Result<void> GenerateApexConfiguration(
+    const std::string& base_dir, android::linkerconfig::contents::Context& ctx,
+    const android::linkerconfig::modules::ApexInfo& target_apex) {
+  std::string dir_path = base_dir + "/" + target_apex.name;
+  if (auto ret = mkdir(dir_path.c_str(), 0755); ret != 0 && errno != EEXIST) {
+    return ErrnoError() << "Failed to create directory " << dir_path;
+  }
+
+  return GenerateConfiguration(
+      android::linkerconfig::contents::CreateApexConfiguration(ctx, target_apex),
+      dir_path,
+      true);
+}
+
+void GenerateApexConfigurations(Context& ctx, const std::string& dir_path) {
+  for (auto const& apex_item : ctx.GetApexModules()) {
+    if (apex_item.has_bin) {
+      auto result = GenerateApexConfiguration(dir_path, ctx, apex_item);
+      if (!result.ok()) {
+        LOG(WARNING) << result.error();
+      }
+    }
+  }
+}
+
+void ExitOnFailure(Result<void> task) {
+  if (!task.ok()) {
+    LOG(FATAL) << task.error();
+    exit(EXIT_FAILURE);
+  }
 }
 
 #ifdef __ANDROID__
@@ -106,7 +281,6 @@ struct CombinedLogger {
   }
 };
 #endif
-
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -117,41 +291,23 @@ int main(int argc, char* argv[]) {
 #endif
   );
 
-  ProgramArgs args;
+  ProgramArgs args = {};
 
   if (!ParseArgs(argc, argv, &args)) {
     PrintUsage(EXIT_FAILURE);
   }
 
-  std::ostream* out = &std::cout;
-  std::ofstream file_out;
+  LoadVariables(args);
+  Context ctx = GetContext(args);
 
-  if (args.target_file != "") {
-    file_out.open(args.target_file);
-    if (file_out.fail()) {
-      PLOG(FATAL) << "Failed to open file " << args.target_file;
-      return EXIT_FAILURE;
-    }
-    out = &file_out;
-  }
-
-#ifndef __ANDROID__
-  if (args.root == "" || args.vndk_version == "") {
-    PrintUsage();
-  }
-  android::linkerconfig::modules::Variables::AddValue("ro.vndk.version",
-                                                      args.vndk_version);
-#endif
-
-  android::linkerconfig::generator::LoadVariables(args.root);
-  auto config = GetConfiguration();
-  android::linkerconfig::modules::ConfigWriter config_writer;
-
-  config.WriteConfig(config_writer);
-  *out << config_writer.ToString();
-  if (!out->good()) {
-    PLOG(FATAL) << "Failed to write content to " << args.target_file;
-    return EXIT_FAILURE;
+  if (args.is_recovery) {
+    ExitOnFailure(
+        GenerateRecoveryLinkerConfiguration(ctx, args.target_directory));
+  } else if (args.is_legacy) {
+    ExitOnFailure(GenerateLegacyLinkerConfiguration(ctx, args.target_directory));
+  } else {
+    ExitOnFailure(GenerateBaseLinkerConfiguration(ctx, args.target_directory));
+    GenerateApexConfigurations(ctx, args.target_directory);
   }
 
   return EXIT_SUCCESS;

@@ -15,14 +15,18 @@
  */
 
 #include "linkerconfig/environment.h"
+
+#include <unistd.h>
+
 #include "linkerconfig/variables.h"
 
 namespace android {
 namespace linkerconfig {
 namespace modules {
 bool IsLegacyDevice() {
-  return !Variables::GetValue("ro.vndk.version").has_value() &&
-         !Variables::GetValue("ro.vndk.lite").has_value();
+  return (!Variables::GetValue("ro.vndk.version").has_value() &&
+          !Variables::GetValue("ro.vndk.lite").has_value()) ||
+         Variables::GetValue("ro.treble.enabled") == "false";
 }
 
 bool IsVndkLiteDevice() {
@@ -35,6 +39,18 @@ bool IsVndkInSystemNamespace() {
 
 std::string GetVendorVndkVersion() {
   return Variables::GetValue("ro.vndk.version").value_or("");
+}
+
+std::string GetProductVndkVersion() {
+  return Variables::GetValue("ro.product.vndk.version").value_or("");
+}
+
+bool IsProductVndkVersionDefined() {
+  return Variables::GetValue("ro.product.vndk.version").has_value();
+}
+
+bool IsRecoveryMode() {
+  return access("/system/bin/recovery", F_OK) == 0;
 }
 }  // namespace modules
 }  // namespace linkerconfig

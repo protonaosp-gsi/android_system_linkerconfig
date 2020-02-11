@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+// This is the default linker namespace for a vendor process (a process started
+// from /vendor/bin/*).
+
 #include "linkerconfig/environment.h"
 #include "linkerconfig/namespacebuilder.h"
 
@@ -22,6 +25,8 @@ using android::linkerconfig::modules::GetVendorVndkVersion;
 using android::linkerconfig::modules::Namespace;
 
 namespace {
+
+// Keep in sync with the "platform" namespace in art/build/apex/ld.config.txt.
 const std::vector<std::string> kVndkLiteArtLibs = {
     "libdexfile_external.so",
     "libdexfiled_external.so",
@@ -33,6 +38,7 @@ const std::vector<std::string> kVndkLiteArtLibs = {
     "libicui18n.so",
     "libicuuc.so",
 };
+
 }  // namespace
 
 namespace android {
@@ -60,15 +66,13 @@ Namespace BuildVendorDefaultNamespace([[maybe_unused]] const Context& ctx) {
 
   // VNDK-Lite devices require broader access from vendor to system/product partition
   if (is_vndklite) {
-    ns.AddSearchPath("/system/${LIB}/vndk-sp-@{VNDK_VER}",
-                     AsanPath::WITH_DATA_ASAN);
     ns.AddSearchPath("/system/${LIB}", AsanPath::WITH_DATA_ASAN);
     ns.AddSearchPath("/@{SYSTEM_EXT:system_ext}/${LIB}",
                      AsanPath::WITH_DATA_ASAN);
     ns.AddSearchPath("/@{PRODUCT:product}/${LIB}", AsanPath::WITH_DATA_ASAN);
-    // Put /system/lib/vndk at the last search order in vndk_lite for GSI
-    ns.AddSearchPath("/system/${LIB}/vndk-@{VNDK_VER}",
-                     AsanPath::WITH_DATA_ASAN);
+    // Put system vndk at the last search order in vndk_lite for GSI
+    ns.AddSearchPath("/apex/com.android.vndk.v@{VENDOR_VNDK_VERSION}/${LIB}",
+                     AsanPath::SAME_PATH);
   }
 
   if (ctx.IsDefaultConfig() && GetVendorVndkVersion() == "27") {
@@ -81,18 +85,18 @@ Namespace BuildVendorDefaultNamespace([[maybe_unused]] const Context& ctx) {
   ns.AddPermittedPath("/system/vendor", AsanPath::NONE);
 
   if (is_vndklite) {
-    ns.GetLink("art").AddSharedLib(kVndkLiteArtLibs);
+    ns.AddRequires(kVndkLiteArtLibs);
   } else {
-    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("@{LLNDK_LIBRARIES}");
-    ns.GetLink("vndk").AddSharedLib(
-        {"@{VNDK_SAMEPROCESS_LIBRARIES}", "@{VNDK_CORE_LIBRARIES}"});
+    ns.GetLink(ctx.GetSystemNamespaceName())
+        .AddSharedLib("@{LLNDK_LIBRARIES_VENDOR}");
+    ns.GetLink("vndk").AddSharedLib({"@{VNDK_SAMEPROCESS_LIBRARIES_VENDOR}",
+                                     "@{VNDK_CORE_LIBRARIES_VENDOR}"});
     if (android::linkerconfig::modules::IsVndkInSystemNamespace()) {
       ns.GetLink("vndk_in_system")
           .AddSharedLib("@{VNDK_USING_CORE_VARIANT_LIBRARIES}");
     }
   }
-  ns.GetLink("neuralnetworks").AddSharedLib("libneuralnetworks.so");
-
+  ns.AddRequires(std::vector{"libneuralnetworks.so"});
   return ns;
 }
 }  // namespace contents

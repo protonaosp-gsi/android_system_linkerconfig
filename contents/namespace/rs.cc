@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+// This namespace is exclusively for Renderscript internal libraries. This
+// namespace has slightly looser restriction than the vndk namespace because of
+// the genuine characteristics of Renderscript; /data is in the permitted path
+// to load the compiled *.so file and libmediandk.so can be used here.
+
 #include "linkerconfig/namespacebuilder.h"
 
 using android::linkerconfig::modules::AsanPath;
@@ -27,8 +32,8 @@ Namespace BuildRsNamespace([[maybe_unused]] const Context& ctx) {
 
   ns.AddSearchPath("/odm/${LIB}/vndk-sp", AsanPath::WITH_DATA_ASAN);
   ns.AddSearchPath("/vendor/${LIB}/vndk-sp", AsanPath::WITH_DATA_ASAN);
-  ns.AddSearchPath("/system/${LIB}/vndk-sp-@{VNDK_VER}",
-                   AsanPath::WITH_DATA_ASAN);
+  ns.AddSearchPath("/apex/com.android.vndk.v@{VENDOR_VNDK_VERSION}/${LIB}",
+                   AsanPath::SAME_PATH);
   ns.AddSearchPath("/odm/${LIB}", AsanPath::WITH_DATA_ASAN);
   ns.AddSearchPath("/vendor/${LIB}", AsanPath::WITH_DATA_ASAN);
 
@@ -37,9 +42,13 @@ Namespace BuildRsNamespace([[maybe_unused]] const Context& ctx) {
   ns.AddPermittedPath("/system/vendor/${LIB}", AsanPath::NONE);
   ns.AddPermittedPath("/data", AsanPath::SAME_PATH);
 
+  // Private LLNDK libs (e.g. libft2.so) are exceptionally allowed to this
+  // namespace because RS framework libs are using them.
   ns.GetLink(ctx.GetSystemNamespaceName())
-      .AddSharedLib({"@{LLNDK_LIBRARIES}", "@{PRIVATE_LLNDK_LIBRARIES:}"});
-  ns.GetLink("neuralnetworks").AddSharedLib("libneuralnetworks.so");
+      .AddSharedLib(
+          {"@{LLNDK_LIBRARIES_VENDOR}", "@{PRIVATE_LLNDK_LIBRARIES_VENDOR:}"});
+
+  ns.AddRequires(std::vector{"libneuralnetworks.so"});
 
   return ns;
 }

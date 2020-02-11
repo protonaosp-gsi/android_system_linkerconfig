@@ -34,12 +34,21 @@ class Link {
   }
   Link(const Link&) = delete;
   Link(Link&&) = default;
+  Link& operator=(Link&&) = default;
 
   template <typename T, typename... Args>
   void AddSharedLib(T&& lib_name, Args&&... lib_names);
   void AddSharedLib(const std::vector<std::string>& lib_names);
   void AllowAllSharedLibs();
-  void WriteConfig(ConfigWriter& writer);
+  void WriteConfig(ConfigWriter& writer) const;
+
+  // accessors
+  std::vector<std::string> GetSharedLibs() const {
+    return shared_libs_;
+  }
+  std::string To() const {
+    return target_namespace_;
+  }
 
  private:
   const std::string origin_namespace_;

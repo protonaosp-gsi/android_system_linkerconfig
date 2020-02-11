@@ -15,10 +15,11 @@
  */
 #pragma once
 
-#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "linkerconfig/apex.h"
 #include "linkerconfig/configwriter.h"
 #include "linkerconfig/link.h"
 #include "linkerconfig/log.h"
@@ -51,6 +52,7 @@ class Namespace {
 
   Namespace(const Namespace& ns) = delete;
   Namespace(Namespace&& ns) = default;
+  Namespace& operator=(Namespace&& ns) = default;
 
   // Add path to search path
   // This function will add path to namespace.<<namespace>>.search.paths
@@ -91,31 +93,61 @@ class Namespace {
                         AsanPath path_from_asan = AsanPath::SAME_PATH);
 
   // Returns a link from this namespace to the given one. If one already exists
-  // it is returned, otherwise one is created.
+  // it is returned, otherwise one is created and pushed back to tail.
   Link& GetLink(const std::string& target_namespace);
 
   void WriteConfig(ConfigWriter& writer);
   void AddWhitelisted(const std::string& path);
 
-  std::string GetName();
+  std::string GetName() const;
+
+  void SetVisible(bool visible) {
+    is_visible_ = visible;
+  }
 
   // For test usage
+  const std::vector<Link>& Links() const {
+    return links_;
+  }
+  std::vector<std::string> SearchPaths() const {
+    return search_paths_;
+  }
   bool ContainsSearchPath(const std::string& path, AsanPath path_from_asan);
   bool ContainsPermittedPath(const std::string& path, AsanPath path_from_asan);
 
+  template <typename Vec>
+  void AddProvides(const Vec& list) {
+    provides_.insert(list.begin(), list.end());
+  }
+  template <typename Vec>
+  void AddRequires(const Vec& list) {
+    requires_.insert(list.begin(), list.end());
+  }
+  const std::set<std::string>& GetProvides() const {
+    return provides_;
+  }
+  const std::set<std::string>& GetRequires() const {
+    return requires_;
+  }
+
  private:
-  const bool is_isolated_;
-  const bool is_visible_;
-  const std::string name_;
+  bool is_isolated_;
+  bool is_visible_;
+  std::string name_;
   std::vector<std::string> search_paths_;
   std::vector<std::string> permitted_paths_;
   std::vector<std::string> asan_search_paths_;
   std::vector<std::string> asan_permitted_paths_;
   std::vector<std::string> whitelisted_;
-  std::map<std::string, Link> links_;
+  std::vector<Link> links_;
+  std::set<std::string> provides_;
+  std::set<std::string> requires_;
+
   void WritePathString(ConfigWriter& writer, const std::string& path_type,
                        const std::vector<std::string>& path_list);
 };
+
+void InitializeWithApex(Namespace& ns, const ApexInfo& apex_info);
 }  // namespace modules
 }  // namespace linkerconfig
 }  // namespace android

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,30 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include "linkerconfig/namespacebuilder.h"
 
-#include <string>
-#include <vector>
+#include "linkerconfig/apex.h"
+#include "linkerconfig/environment.h"
+#include "linkerconfig/namespace.h"
 
+using android::linkerconfig::modules::ApexInfo;
 using android::linkerconfig::modules::AsanPath;
 using android::linkerconfig::modules::Namespace;
-
-namespace {
-const std::vector<std::string> kLibsFromDefault = {"libcgrouprc.so",
-                                                   "libbinder_ndk.so",
-                                                   "liblog.so",
-                                                   "libvndksupport.so"};
-}  // namespace
 
 namespace android {
 namespace linkerconfig {
 namespace contents {
-Namespace BuildResolvNamespace([[maybe_unused]] const Context& ctx) {
-  Namespace ns("resolv", /*is_isolated=*/true, /*is_visible=*/true);
-  ns.AddSearchPath("/apex/com.android.resolv/${LIB}", AsanPath::SAME_PATH);
+Namespace BuildApexDefaultNamespace([[maybe_unused]] const Context& ctx,
+                                    const ApexInfo& apex_info) {
+  Namespace ns("default", /*is_isolated=*/true, /*is_visible=*/false);
 
-  ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib(kLibsFromDefault);
+  ns.AddSearchPath(apex_info.path + "/${LIB}", AsanPath::SAME_PATH);
+  ns.AddPermittedPath(apex_info.path + "/${LIB}", AsanPath::SAME_PATH);
+  ns.AddPermittedPath("/system/${LIB}");
+
+  ns.AddRequires(apex_info.require_libs);
+  ns.AddProvides(apex_info.provide_libs);
 
   return ns;
 }
