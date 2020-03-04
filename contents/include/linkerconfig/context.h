@@ -64,6 +64,9 @@ class Context : public modules::BaseContext {
   void SetCurrentSection(SectionType value);
   void SetCurrentLinkerConfigType(LinkerConfigType value);
 
+  // Returns true if vndk apex is available
+  bool IsVndkAvailable() const;
+
   // Returns the namespace that covers /system/${LIB}.
   std::string GetSystemNamespaceName() const;
 
@@ -78,6 +81,10 @@ class Context : public modules::BaseContext {
   SectionType current_section_;
   LinkerConfigType current_linkerconfig_type_;
 };
+
+std::string Var(const std::string& name);
+
+std::string Var(const std::string& name, const std::string& default_value);
 
 }  // namespace contents
 }  // namespace linkerconfig

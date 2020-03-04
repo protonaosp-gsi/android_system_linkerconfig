@@ -25,7 +25,6 @@
 
 #include "linkerconfig/log.h"
 
-using android::base::Errorf;
 using android::base::Join;
 using android::base::Result;
 
@@ -33,7 +32,7 @@ namespace android {
 namespace linkerconfig {
 namespace modules {
 void Section::WriteConfig(ConfigWriter& writer) {
-  writer.WriteLine("[%s]", name_.c_str());
+  writer.WriteLine("[" + name_ + "]");
 
   std::sort(namespaces_.begin(),
             namespaces_.end(),

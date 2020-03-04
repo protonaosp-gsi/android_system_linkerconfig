@@ -22,7 +22,6 @@
 #include "linkerconfig/apex.h"
 #include "linkerconfig/configwriter.h"
 #include "linkerconfig/link.h"
-#include "linkerconfig/log.h"
 
 namespace android {
 namespace linkerconfig {
@@ -103,6 +102,9 @@ class Namespace {
 
   void SetVisible(bool visible) {
     is_visible_ = visible;
+  }
+  bool IsVisible() const {
+    return is_visible_;
   }
 
   // For test usage

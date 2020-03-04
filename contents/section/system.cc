@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "linkerconfig/sectionbuilder.h"
-
 #include "linkerconfig/common.h"
 #include "linkerconfig/context.h"
+#include "linkerconfig/environment.h"
 #include "linkerconfig/namespacebuilder.h"
 #include "linkerconfig/section.h"
+#include "linkerconfig/sectionbuilder.h"
 
 using android::linkerconfig::contents::SectionType;
 using android::linkerconfig::modules::Namespace;
@@ -33,21 +33,34 @@ Section BuildSystemSection(Context& ctx) {
   std::vector<Namespace> namespaces;
 
   namespaces.emplace_back(BuildSystemDefaultNamespace(ctx));
-  namespaces.emplace_back(BuildSphalNamespace(ctx));
-  namespaces.emplace_back(BuildRsNamespace(ctx));
-  namespaces.emplace_back(BuildVndkNamespace(ctx));
+  if (ctx.IsVndkAvailable()) {
+    namespaces.emplace_back(BuildSphalNamespace(ctx));
+    namespaces.emplace_back(BuildRsNamespace(ctx));
+    namespaces.emplace_back(BuildVndkNamespace(ctx, VndkUserPartition::Vendor));
+    if (android::linkerconfig::modules::IsProductVndkVersionDefined()) {
+      namespaces.emplace_back(
+          BuildVndkNamespace(ctx, VndkUserPartition::Product));
+    }
+  }
 
-  return BuildSection(ctx,
-                      "system",
-                      std::move(namespaces),
-                      {
-                          "com.android.art",
-                          "com.android.neuralnetworks",
-                          "com.android.runtime",
-                          "com.android.cronet",
-                          "com.android.media",
-                          "com.android.conscrypt",
-                      });
+  std::set<std::string> visible_apexes{
+      "com.android.art",
+      "com.android.neuralnetworks",
+      "com.android.runtime",
+      "com.android.cronet",
+      "com.android.media",
+      "com.android.conscrypt",
+      "com.android.os.statsd",
+  };
+
+  // APEXes with JNI libs should be visible
+  for (const auto& apex : ctx.GetApexModules()) {
+    if (apex.jni_libs.size() > 0) {
+      visible_apexes.insert(apex.name);
+    }
+  }
+
+  return BuildSection(ctx, "system", std::move(namespaces), visible_apexes);
 }
 }  // namespace contents
 }  // namespace linkerconfig
