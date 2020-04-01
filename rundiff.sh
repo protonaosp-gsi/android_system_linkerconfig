@@ -14,42 +14,94 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ -z $ANDROID_BUILD_TOP ]; then
-  echo "You need to source and lunch before you can use this script"
-  exit 1
+set -e
+shopt -s extglob
+
+# to use relative paths
+cd $(dirname $0)
+
+# when executed directly from commandline, build dependencies
+if [[ $(basename $0) == "rundiff.sh" ]]; then
+  if [ -z $ANDROID_BUILD_TOP ]; then
+    echo "You need to source and lunch before you can use this script"
+    exit 1
+  fi
+  $ANDROID_BUILD_TOP/build/soong/soong_ui.bash --make-mode linkerconfig conv_apex_manifest
 fi
 
-set -e
+# $1: tmp root
+# $2: apex
+function activate() {
+  cp -r ./testdata/root/apex/$2 $1/apex
+}
 
-$ANDROID_BUILD_TOP/build/soong/soong_ui.bash --make-mode linkerconfig conv_apex_manifest
+# $1: target output directory
+function run_linkerconfig_to {
+  # delete old output
+  rm -rf $1
 
-LINKERCONFIG_DIR=$ANDROID_BUILD_TOP/system/linkerconfig
-LINKERCONFIG_BIN=$ANDROID_HOST_OUT/bin/linkerconfig
-CONV_APEX_BIN=$ANDROID_HOST_OUT/bin/conv_apex_manifest
+  # prepare root with no apexes
+  TMP_ROOT=$(mktemp -d -t linkerconfig-root-XXXXXXXX)
+  cp -R ./testdata/root/!(apex) $TMP_ROOT
 
-GOLDEN_OUT=$LINKERCONFIG_DIR/testdata/golden_output
-TEST_OUT=$LINKERCONFIG_DIR/testdata/output
+  mkdir -p $1/stage0
+  linkerconfig -v R -r $TMP_ROOT -t $1/stage0
 
-echo "Running linkerconfig "
+  # activate bootstrap apexes
+  mkdir -p $TMP_ROOT/apex
+  activate $TMP_ROOT com.android.art
+  activate $TMP_ROOT com.android.i18n
+  # activate $TMP_ROOT com.android.os.statsd
+  activate $TMP_ROOT com.android.runtime
+  activate $TMP_ROOT com.android.tzdata
+  activate $TMP_ROOT com.android.vndk.vR
 
-TMP_ROOT=$(mktemp -d -t linkerconfig-XXXXXXXX)
+  find $TMP_ROOT -name apex_manifest.json -exec sh -c '$2 proto $1 -o ${1%.json}.pb' sh  {} conv_apex_manifest \;
+  find $TMP_ROOT -name apex_manifest.json -exec sh -c 'mkdir `dirname $1`/lib' sh  {}  \;
 
-cp -R $LINKERCONFIG_DIR/testdata/root/* $TMP_ROOT
+  mkdir -p $1/stage1
+  linkerconfig -v R -r $TMP_ROOT -t $1/stage1
 
-find $TMP_ROOT -name apex_manifest.json -exec sh -c '$2 proto $1 -o ${1%.json}.pb' sh  {} $CONV_APEX_BIN \;
-find $TMP_ROOT -name apex_manifest.json -exec sh -c 'mkdir `dirname $1`/lib' sh  {}  \;
+  # clean up testdata root
+  rm -iRf $TMP_ROOT
 
-rm -rf $TEST_OUT
-mkdir -p $TEST_OUT
-$LINKERCONFIG_BIN -v R -r $TMP_ROOT -t $TEST_OUT
-rm -rf $TMP_ROOT
+  # prepare root with all apexes
+  TMP_ROOT=$(mktemp -d -t linkerconfig-root-XXXXXXXX)
+  cp -R ./testdata/root/* $TMP_ROOT
+  find $TMP_ROOT -name apex_manifest.json -exec sh -c '$2 proto $1 -o ${1%.json}.pb' sh  {} conv_apex_manifest \;
+  find $TMP_ROOT -name apex_manifest.json -exec sh -c 'mkdir `dirname $1`/lib' sh  {}  \;
 
-if diff -ruN $GOLDEN_OUT $TEST_OUT ; then
-  echo "no changes"
+  mkdir -p $1/stage2
+  linkerconfig -v R -r $TMP_ROOT -t $1/stage2
+
+  mkdir -p $1/product-enabled
+  linkerconfig -v R -p R -r $TMP_ROOT -t $1/product-enabled
+
+  mkdir -p $1/vndk-lite
+  linkerconfig -v R -e -r $TMP_ROOT -t $1/vndk-lite
+
+  # clean up testdata root
+  rm -rf $TMP_ROOT
+}
+
+# update golden_output
+if [[ $1 == "--update" ]]; then
+  run_linkerconfig_to ./testdata/golden_output
+  echo "Updated"
+  exit 0
+fi
+
+echo "Running linkerconfig diff test..."
+
+run_linkerconfig_to ./testdata/output
+if diff -ruN ./testdata/golden_output ./testdata/output ; then
+  echo "No changes."
 else
   echo
   echo "------------------------------------------------------------------------------------------"
   echo "if change looks fine, run following:"
-  echo "  rm -iRf $GOLDEN_OUT && cp -R $TEST_OUT $GOLDEN_OUT"
+  echo "  \$ANDROID_BUILD_TOP/system/linkerconfig/rundiff.sh --update"
   echo "------------------------------------------------------------------------------------------"
+  # fail
+  exit 1
 fi
