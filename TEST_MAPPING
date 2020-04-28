@@ -2,15 +2,6 @@
   "presubmit": [
     {
       "name": "linkerconfig_modules_unittest"
-    },
-    {
-      "name" : "linkerconfig_backward_compatibility_test"
-    },
-    {
-      "name" : "linkerconfig_contents_fulltest"
-    },
-    {
-      "name" : "linkerconfig_generator_unittest"
     }
   ]
 }

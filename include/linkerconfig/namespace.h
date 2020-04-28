@@ -21,87 +21,58 @@
 
 #include "linkerconfig/configwriter.h"
 #include "linkerconfig/link.h"
-#include "linkerconfig/log.h"
 
 namespace android {
 namespace linkerconfig {
 namespace modules {
 
-/**
- * Explains if the path should be also added for ASAN
- *
- * NONE : the path should not be added for ASAN
- * SAME_PATH : the path should be added for ASAN
- * WITH_DATA_ASAN : the path and /data/asan/<path> should be added for ASAN
- */
-enum class AsanPath {
-  NONE,
-  SAME_PATH,
-  WITH_DATA_ASAN,
-};
-
 class Namespace {
  public:
-  explicit Namespace(std::string name, bool is_isolated = false,
-                     bool is_visible = false)
-      : is_isolated_(is_isolated),
-        is_visible_(is_visible),
-        name_(std::move(name)) {
+  Namespace(const std::string& name, bool is_isolated = false,
+            bool is_visible = false)
+      : is_isolated_(is_isolated), is_visible_(is_visible), name_(name) {
   }
-
-  Namespace(const Namespace& ns) = delete;
-  Namespace(Namespace&& ns) = default;
 
   // Add path to search path
   // This function will add path to namespace.<<namespace>>.search.paths
-  // If path_from_asan is SAME_PATH, this will add path also to
+  // If also_in_asan is true, this will add path also to
   // namespace.<<namespace>>.asan.search.paths
-  // If path_from_asan is WITH_DATA_ASAN,
+  // If with_data_asan is true when also_in_asan is true,
   // this will also add asan path starts with /data/asan
   //
-  // AddSearchPath("/system/${LIB}", AsanPath::NONE) :
+  // AddSearchPath("/system/${LIB}", false, false) :
   //    namespace.xxx.search.paths += /system/${LIB}
-  // AddSearchPath("/system/${LIB}", AsanPath::SAME_PATH) :
+  // AddSearchPath("/system/${LIB}", true, false) :
   //    namespace.xxx.search.paths += /system/${LIB}
   //    namespace.xxx.asan.search.paths += /system/${LIB}
-  // AddSearchPath("/system/${LIB}", AsanPath::WITH_DATA_ASAN) :
+  // AddSearchPath("/system/${LIB}", true, true) :
   //    namespace.xxx.search.paths += /system/${LIB}
+  //    namespace.xxx.asan.search.paths += /system/${LIB}
   //    namespace.xxx.asan.search.paths += /data/asan/system/${LIB}
-  //    namespace.xxx.asan.search.paths += /system/${LIB}
-  void AddSearchPath(const std::string& path,
-                     AsanPath path_from_asan = AsanPath::SAME_PATH);
+  void AddSearchPath(const std::string& path, bool also_in_asan = true,
+                     bool with_data_asan = true);
 
   // Add path to permitted path
   // This function will add path to namespace.<<namespace>>.permitted.paths
-  // If path_from_asan is SAME_PATH, this will add path also to
+  // If also_in_asan is true, this will add path also to
   // namespace.<<namespace>>.asan.permitted.paths
-  // If path_from_asan is WITH_DATA_ASAN,
+  // If with_data_asan is true when also_in_asan is true,
   // this will also add asan path starts with /data/asan
   //
-  // AddSearchPath("/system/${LIB}", AsanPath::NONE) :
+  // AddSearchPath("/system/${LIB}", false, false) :
   //    namespace.xxx.permitted.paths += /system/${LIB}
-  // AddSearchPath("/system/${LIB}", AsanPath::SAME_PATH) :
+  // AddSearchPath("/system/${LIB}", true, false) :
   //    namespace.xxx.permitted.paths += /system/${LIB}
   //    namespace.xxx.asan.permitted.paths += /system/${LIB}
-  // AddSearchPath("/system/${LIB}", AsanPath::WITH_DATA_ASAN) :
+  // AddSearchPath("/system/${LIB}", true, true) :
   //    namespace.xxx.permitted.paths += /system/${LIB}
+  //    namespace.xxx.asan.permitted.paths += /system/${LIB}
   //    namespace.xxx.asan.permitted.paths += /data/asan/system/${LIB}
-  //    namespace.xxx.asan.permitted.paths += /system/${LIB}
-  void AddPermittedPath(const std::string& path,
-                        AsanPath path_from_asan = AsanPath::SAME_PATH);
-
-  // Returns a link from this namespace to the given one. If one already exists
-  // it is returned, otherwise one is created.
-  Link& GetLink(const std::string& target_namespace);
-
+  void AddPermittedPath(const std::string& path, bool also_in_asan = true,
+                        bool with_data_asan = true);
+  std::shared_ptr<Link> CreateLink(const std::string& target_namespace,
+                                   bool allow_all_shared_libs = false);
   void WriteConfig(ConfigWriter& writer);
-  void AddWhitelisted(const std::string& path);
-
-  std::string GetName();
-
-  // For test usage
-  bool ContainsSearchPath(const std::string& path, AsanPath path_from_asan);
-  bool ContainsPermittedPath(const std::string& path, AsanPath path_from_asan);
 
  private:
   const bool is_isolated_;
@@ -111,8 +82,7 @@ class Namespace {
   std::vector<std::string> permitted_paths_;
   std::vector<std::string> asan_search_paths_;
   std::vector<std::string> asan_permitted_paths_;
-  std::vector<std::string> whitelisted_;
-  std::map<std::string, Link> links_;
+  std::map<std::string, std::shared_ptr<Link>> links_;
   void WritePathString(ConfigWriter& writer, const std::string& path_type,
                        const std::vector<std::string>& path_list);
 };

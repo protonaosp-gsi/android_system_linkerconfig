@@ -16,9 +16,27 @@
 
 #include "linkerconfig/section.h"
 
+#include "linkerconfig/log.h"
+
+#define LOG_TAG "linkerconfig"
+
 namespace android {
 namespace linkerconfig {
 namespace modules {
+std::shared_ptr<Namespace> Section::CreateNamespace(
+    const std::string& namespace_name, bool is_isolated, bool is_visible) {
+  auto new_namespace =
+      std::make_shared<Namespace>(namespace_name, is_isolated, is_visible);
+
+  if (namespaces_.find(namespace_name) != namespaces_.end()) {
+    LOG(INFO) << "Namespace " << namespace_name
+              << " already exists. Overwriting namespace.";
+  }
+
+  namespaces_[namespace_name] = new_namespace;
+  return new_namespace;
+}
+
 void Section::WriteConfig(ConfigWriter& writer) {
   writer.WriteLine("[%s]", name_.c_str());
 
@@ -26,12 +44,12 @@ void Section::WriteConfig(ConfigWriter& writer) {
 
   bool is_first = true;
   for (auto& ns : namespaces_) {
-    if (ns.GetName() != "default") {
+    if (ns.first != "default") {
       if (!is_first) {
         additional_namespaces += ",";
       }
 
-      additional_namespaces += ns.GetName();
+      additional_namespaces += ns.first;
       is_first = false;
     }
   }
@@ -41,18 +59,18 @@ void Section::WriteConfig(ConfigWriter& writer) {
   }
 
   for (auto& ns : namespaces_) {
-    ns.WriteConfig(writer);
+    ns.second->WriteConfig(writer);
   }
 }
 
-Namespace* Section::GetNamespace(const std::string& namespace_name) {
-  for (auto& ns : namespaces_) {
-    if (ns.GetName() == namespace_name) {
-      return &ns;
-    }
+void Section::WriteBinaryPaths(ConfigWriter& writer) {
+  writer.SetPrefix("dir." + name_ + " = ");
+
+  for (auto& path : binary_paths_) {
+    writer.WriteLine(path);
   }
 
-  return nullptr;
+  writer.ResetPrefix();
 }
 
 std::string Section::GetName() {

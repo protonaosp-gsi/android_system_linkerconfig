@@ -15,46 +15,42 @@
  */
 #pragma once
 
+#include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "linkerconfig/configwriter.h"
-#include "linkerconfig/log.h"
+#include "linkerconfig/namespace.h"
 
 namespace android {
 namespace linkerconfig {
 namespace modules {
-class Link {
+class Section {
  public:
-  Link(std::string origin_namespace, std::string target_namespace)
-      : origin_namespace_(std::move(origin_namespace)),
-        target_namespace_(std::move(target_namespace)) {
-    allow_all_shared_libs_ = false;
+  Section(const std::string& name) : name_(name) {
   }
-  Link(const Link&) = delete;
-  Link(Link&&) = default;
-
   template <typename T, typename... Args>
-  void AddSharedLib(T&& lib_name, Args&&... lib_names);
-  void AddSharedLib(const std::vector<std::string>& lib_names);
-  void AllowAllSharedLibs();
+  void AddBinaryPath(T&& binary_path, Args&&... binary_paths);
+  std::shared_ptr<Namespace> CreateNamespace(const std::string& namespace_name,
+                                             bool is_isolated = false,
+                                             bool is_visible = false);
   void WriteConfig(ConfigWriter& writer);
+  void WriteBinaryPaths(ConfigWriter& writer);
+  std::string GetName();
 
  private:
-  const std::string origin_namespace_;
-  const std::string target_namespace_;
-  std::vector<std::string> shared_libs_;
-  bool allow_all_shared_libs_;
+  const std::string name_;
+  std::vector<std::string> binary_paths_;
+  std::map<std::string, std::shared_ptr<Namespace>> namespaces_;
 };
 
 template <typename T, typename... Args>
-void Link::AddSharedLib(T&& lib_name, Args&&... lib_names) {
-  if (!allow_all_shared_libs_) {
-    shared_libs_.push_back(std::forward<T>(lib_name));
-    if constexpr (sizeof...(Args) > 0) {
-      AddSharedLib(std::forward<Args>(lib_names)...);
-    }
+void Section::AddBinaryPath(T&& binary_path, Args&&... binary_paths) {
+  binary_paths_.push_back(std::forward<T>(binary_path));
+  if constexpr (sizeof...(Args) > 0) {
+    AddBinaryPath(std::forward<Args>(binary_paths)...);
   }
 }
 }  // namespace modules

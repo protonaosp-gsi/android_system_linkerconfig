@@ -13,26 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma once
 
-#include "linkerconfig/sectionbuilder.h"
-
-#include "linkerconfig/namespacebuilder.h"
-
-using android::linkerconfig::contents::SectionType;
-using android::linkerconfig::modules::Namespace;
-using android::linkerconfig::modules::Section;
+#include <sstream>
+#include <string>
 
 namespace android {
 namespace linkerconfig {
-namespace contents {
-Section BuildPostInstallSection(Context& ctx) {
-  ctx.SetCurrentSection(SectionType::Other);
-  std::vector<Namespace> namespaces;
+namespace modules {
 
-  namespaces.emplace_back(BuildPostInstallNamespace(ctx));
+class ConfigWriter {
+ public:
+  void SetPrefix(const std::string& prefix);
+  void ResetPrefix();
+  void WriteLine(const std::string& line);
+  void WriteLine(const char* format, ...);
+  std::string ToString();
 
-  return Section("postinstall", std::move(namespaces));
-}
-}  // namespace contents
+ private:
+  std::stringstream content_;
+  std::string prefix_;
+
+  std::string ResolveVariables(const std::string& str);
+};
+
+}  // namespace modules
 }  // namespace linkerconfig
 }  // namespace android

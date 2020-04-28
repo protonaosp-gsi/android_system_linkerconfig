@@ -15,20 +15,21 @@
  */
 #pragma once
 
-#include "linkerconfig/context.h"
-#include "linkerconfig/section.h"
-
-typedef android::linkerconfig::modules::Section SectionBuilder(
-    android::linkerconfig::contents::Context& ctx);
+#include <map>
+#include <optional>
+#include <string>
 
 namespace android {
 namespace linkerconfig {
-namespace contents {
-SectionBuilder BuildSystemSection;
-SectionBuilder BuildVendorSection;
-SectionBuilder BuildUnrestrictedSection;
-SectionBuilder BuildLegacySection;
-SectionBuilder BuildPostInstallSection;
-}  // namespace contents
+namespace modules {
+class Variables {
+ public:
+  static std::optional<std::string> GetValue(const std::string& key);
+  static void AddValue(const std::string& key, const std::string& value);
+
+ private:
+  static std::map<std::string, std::string> variables_;
+};
+}  // namespace modules
 }  // namespace linkerconfig
 }  // namespace android
