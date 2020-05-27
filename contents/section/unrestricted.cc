@@ -34,13 +34,19 @@ namespace android {
 namespace linkerconfig {
 namespace contents {
 Section BuildUnrestrictedSection(Context& ctx) {
-  ctx.SetCurrentSection(SectionType::Other);
+  ctx.SetCurrentSection(SectionType::Unrestricted);
   std::vector<Namespace> namespaces;
 
   namespaces.emplace_back(BuildUnrestrictedDefaultNamespace(ctx));
+  if (ctx.IsVndkAvailable()) {
+    namespaces.emplace_back(BuildSphalNamespace(ctx));
+    namespaces.emplace_back(BuildVndkNamespace(ctx, VndkUserPartition::Vendor));
+    namespaces.emplace_back(BuildRsNamespace(ctx));
+  }
 
   std::set<std::string> visible_apexes{
       "com.android.art",
+      "com.android.i18n",
       "com.android.neuralnetworks",
       "com.android.runtime",
       "com.android.media",
