@@ -57,7 +57,6 @@ const static struct option program_options[] = {
 #ifndef __ANDROID__
     {"root", required_argument, 0, 'r'},
     {"vndk", required_argument, 0, 'v'},
-    {"vndk_lite", no_argument, 0, 'e'},
     {"product_vndk", required_argument, 0, 'p'},
     {"recovery", no_argument, 0, 'y'},
 #endif
@@ -69,7 +68,6 @@ struct ProgramArgs {
   bool strict;
   std::string root;
   std::string vndk_version;
-  bool vndk_lite;
   std::string product_vndk_version;
   bool is_recovery;
 };
@@ -80,7 +78,6 @@ struct ProgramArgs {
 #ifndef __ANDROID__
                " --root <root dir>"
                " --vndk <vndk version>"
-               " --vndk_lite"
                " --product_vndk <product vndk version>"
                " --recovery"
 #endif
@@ -114,9 +111,6 @@ bool ParseArgs(int argc, char* argv[], ProgramArgs* args) {
       case 'v':
         args->vndk_version = optarg;
         break;
-      case 'e':
-        args->vndk_lite = true;
-        break;
       case 'p':
         args->product_vndk_version = optarg;
         break;
@@ -146,9 +140,6 @@ void LoadVariables(ProgramArgs args) {
                                                       args.vndk_version);
   android::linkerconfig::modules::Variables::AddValue(
       "ro.product.vndk.version", args.product_vndk_version);
-  if (args.vndk_lite) {
-    android::linkerconfig::modules::Variables::AddValue("ro.vndk.lite", "true");
-  }
 #endif
   if (!args.is_recovery) {
     android::linkerconfig::generator::LoadVariables(args.root);
@@ -327,13 +318,19 @@ int main(int argc, char* argv[]) {
     PrintUsage(EXIT_FAILURE);
   }
 
+  if (!android::linkerconfig::modules::IsLegacyDevice() &&
+      android::linkerconfig::modules::IsVndkLiteDevice()) {
+    LOG(ERROR) << "Linkerconfig no longer supports VNDK-Lite configuration";
+    exit(EXIT_FAILURE);
+  }
+
   LoadVariables(args);
   Context ctx = GetContext(args);
 
-  // when exec'ed from init, this is 0x0077, which makes the subdirectories
-  // inaccessible for others. set umask to 0x0022 so that they can be
+  // when exec'ed from init, this is 077, which makes the subdirectories
+  // inaccessible for others. set umask to 022 so that they can be
   // accessible.
-  umask(0x0022);
+  umask(022);
 
   if (args.is_recovery) {
     ExitOnFailure(
