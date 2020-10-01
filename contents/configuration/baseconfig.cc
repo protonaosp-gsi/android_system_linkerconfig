@@ -75,14 +75,29 @@ android::linkerconfig::modules::Configuration CreateBaseConfiguration(
       {"/data/nativetest/unrestricted", "unrestricted"},
       {"/data/nativetest64/unrestricted", "unrestricted"},
 
-      // TODO(b/123864775): Ensure tests are run from /data/nativetest{,64} or
-      // (if necessary) the unrestricted subdirs above. Then clean this up.
+      // Create isolated namespace for development purpose.
+      // This isolates binary from the system so binaries and libraries from
+      // this location can be separated from system libraries.
+      {"/data/local/tmp/isolated", "isolated"},
+
+      // Create directories under shell-writable /data/local/tests for
+      // each namespace in order to run tests.
+      {"/data/local/tests/product", "product"},
+      {"/data/local/tests/system", "system"},
+      {"/data/local/tests/unrestricted", "unrestricted"},
+      {"/data/local/tests/vendor", "vendor"},
+
+      // TODO(b/123864775): Ensure tests are run from one of the subdirectories
+      // above.  Then clean this up.
       {"/data/local/tmp", "unrestricted"},
 
       {"/postinstall", "postinstall"},
       // Fallback entry to provide APEX namespace lookups for binaries anywhere
       // else. This must be last.
       {"/data", "system"},
+      // TODO(b/168556887): Remove this when we have a dedicated section for
+      // binaries in APKs
+      {Var("PRODUCT") + "/app/", "system"},
   };
 
   sections.emplace_back(BuildSystemSection(ctx));
@@ -100,6 +115,8 @@ android::linkerconfig::modules::Configuration CreateBaseConfiguration(
 
   sections.emplace_back(BuildUnrestrictedSection(ctx));
   sections.emplace_back(BuildPostInstallSection(ctx));
+
+  sections.emplace_back(BuildIsolatedSection(ctx));
 
   return android::linkerconfig::modules::Configuration(std::move(sections),
                                                        dirToSection);

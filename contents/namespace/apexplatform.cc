@@ -24,6 +24,7 @@
 #include "linkerconfig/namespace.h"
 
 using android::linkerconfig::modules::ApexInfo;
+using android::linkerconfig::modules::IsProductVndkVersionDefined;
 using android::linkerconfig::modules::Namespace;
 
 namespace {
@@ -31,6 +32,7 @@ std::vector<std::string> required_libs = {
     "libandroidicu.so",
     "libdexfile_external.so",
     "libdexfiled_external.so",
+    "libicu.so",
     // TODO(b/120786417 or b/134659294): libicuuc.so and libicui18n.so are kept
     // for app compat. Uncomment those once they are marked as provided from ART
     // APEX.
@@ -59,6 +61,10 @@ Namespace BuildApexPlatformNamespace([[maybe_unused]] const Context& ctx) {
   Namespace ns("system", /*is_isolated=*/true, /*is_visible=*/true);
 
   ns.AddSearchPath("/system/${LIB}");
+  ns.AddSearchPath(Var("SYSTEM_EXT") + "/${LIB}");
+  if (!IsProductVndkVersionDefined()) {
+    ns.AddSearchPath(Var("PRODUCT") + "/${LIB}");
+  }
   ns.AddPermittedPath("/apex/com.android.runtime/${LIB}/bionic");
 
   ns.AddProvides(GetSystemStubLibraries());

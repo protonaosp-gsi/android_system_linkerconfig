@@ -33,9 +33,11 @@ typedef android::linkerconfig::modules::Section ApexSectionBuilder(
 namespace android {
 namespace linkerconfig {
 namespace contents {
+
 modules::Section BuildSection(const Context& ctx, const std::string& name,
                               std::vector<modules::Namespace>&& namespaces,
-                              const std::set<std::string>& visible_apexes);
+                              const std::set<std::string>& visible_apexes,
+                              const modules::LibProviders& providers = {});
 SectionBuilder BuildSystemSection;
 SectionBuilder BuildVendorSection;
 SectionBuilder BuildProductSection;
@@ -43,6 +45,7 @@ SectionBuilder BuildUnrestrictedSection;
 SectionBuilder BuildLegacySection;
 SectionBuilder BuildPostInstallSection;
 SectionBuilder BuildRecoverySection;
+SectionBuilder BuildIsolatedSection;
 ApexSectionBuilder BuildApexDefaultSection;
 ApexSectionBuilder BuildApexArtSection;
 }  // namespace contents

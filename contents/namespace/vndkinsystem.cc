@@ -21,7 +21,7 @@
 // want to eliminate double-loading because doing so means the global states
 // of the library would be shared.
 //
-// Only the no-vendor-variant VNDK libraries are whitelisted in this namespace.
+// Only the no-vendor-variant VNDK libraries are allowed in this namespace.
 // This is to ensure that we do not load libraries needed by no-vendor-variant
 // VNDK libraries into vndk_in_system namespace.
 
@@ -36,8 +36,9 @@ namespace android {
 namespace linkerconfig {
 namespace contents {
 Namespace BuildVndkInSystemNamespace([[maybe_unused]] const Context& ctx) {
-  Namespace ns("vndk_in_system", /*is_isolated=*/true,
-               /*is_visible=*/true);
+  Namespace ns("vndk_in_system",
+               /*is_isolated=*/true,
+               /*is_visible=*/false);
 
   // The search paths here should be kept the same as that of the 'system' namespace.
   ns.AddSearchPath("/system/${LIB}");
@@ -47,7 +48,7 @@ Namespace BuildVndkInSystemNamespace([[maybe_unused]] const Context& ctx) {
   }
 
   if (android::linkerconfig::modules::IsVndkInSystemNamespace()) {
-    ns.AddWhitelisted(Var("VNDK_USING_CORE_VARIANT_LIBRARIES"));
+    ns.AddAllowedLib(Var("VNDK_USING_CORE_VARIANT_LIBRARIES"));
   }
 
   // The links here should be identical to that of the 'vndk' namespace for the

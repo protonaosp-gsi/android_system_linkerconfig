@@ -26,7 +26,19 @@ cc_defaults {
         "libapexutil",
         "libbase",
         "liblog",
+        "libxml2",
     ],
+    target: {
+        host: {
+            static_libs: [
+                "libicui18n",
+                "libicuuc",
+            ],
+        },
+        not_windows: {
+            static_libs: ["libicuuc_stubdata"],
+        },
+    },
     host_supported: true,
 }
 
@@ -47,6 +59,7 @@ cc_library_static {
     srcs: [
         "modules/*.cc",
     ],
+    generated_sources: ["apex-info-list"],
 }
 
 cc_library_static {
@@ -90,7 +103,6 @@ cc_binary {
     srcs: [
         "main.cc",
     ],
-    static_executable: true,
     required: [
         // files from /system/etc
         "sanitizer.libraries.txt",
@@ -99,6 +111,18 @@ cc_binary {
         // we can't list it here because the exact version is unknown at build-time. It is decided
         // at runtime according to ro.vndk.version (or ro.product.vndk.version)
     ],
+    target: {
+        android: {
+            // This binary needs to be static on device, but it's also packaged
+            // as a host prebuilt in runtime-module-host-exports. On host it
+            // should link all libraries statically except libc and other system
+            // libraries, so enable this only on device.
+            static_executable: true,
+        },
+        host: {
+            stl: "c++_static",  // Link libc++ statically.
+        },
+    },
 }
 
 cc_test {
@@ -110,6 +134,9 @@ cc_test {
     static_libs: [
         "libgmock",
         "linkerconfig_modules",
+    ],
+    data: [
+        "modules/tests/data/linker.config.*",
     ],
 }
 
@@ -169,4 +196,35 @@ genrule {
     out: ["ld.config.txt"],
     tools: ["linkerconfig"],
     cmd: "$(location linkerconfig) --recovery --target $(genDir)",
+}
+
+genrule {
+    name: "linkerconfig_diff_test_host_tools",
+    out: ["linkerconfig_diff_test_host_tools.zip"],
+    tools: ["conv_apex_manifest", "linkerconfig", "soong_zip"],
+    cmd: "HOST_OUT_BIN=$$(dirname $(location conv_apex_manifest)) && " +
+         "HOST_SOONG_OUT=$$(dirname $$HOST_OUT_BIN) && " +
+         "LIBCPLUSPLUS=$$(find $${HOST_SOONG_OUT}/lib64 -name \"libc++.*\") && " +
+         "mkdir -p $(genDir)/tools/bin && " +
+         "mkdir -p $(genDir)/tools/lib64 && " +
+         "cp $(location conv_apex_manifest) $(genDir)/tools/bin && " +
+         "cp $(location linkerconfig) $(genDir)/tools/bin && " +
+         "cp $$LIBCPLUSPLUS $(genDir)/tools/lib64 && " +
+         "$(location soong_zip) -C $(genDir)/tools -D $(genDir)/tools -o $(out)",
+}
+
+sh_test_host {
+    name: "linkerconfig_diff_test",
+    src: "rundiff.sh",
+    filename: "linkerconfig_diff_test.sh",
+    test_suites: ["general-tests"],
+    test_config: "linkerconfig_diff_test.xml",
+    data: [
+        "testdata/**/*",
+        "testdata/**/.*", // copy .keep files
+        // workaround to use host tools(conv_apex_manifest, linkerconfig) on build server
+        // ":conv_apex_manifest",
+        // ":linkerconfig",
+        ":linkerconfig_diff_test_host_tools",
+    ],
 }

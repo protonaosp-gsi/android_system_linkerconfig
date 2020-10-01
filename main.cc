@@ -184,18 +184,20 @@ Result<void> UpdatePermission([[maybe_unused]] const std::string& file_path) {
 }
 
 Context GetContext(ProgramArgs args) {
-  auto apex_list = android::linkerconfig::modules::ScanActiveApexes(args.root);
   Context ctx;
-  for (auto const& apex_item : apex_list) {
-    auto apex_info = apex_item.second;
-    if (apex_info.has_bin || apex_info.has_lib) {
-      ctx.AddApexModule(std::move(apex_info));
-    }
-  }
   if (args.strict) {
     ctx.SetStrictMode(true);
   }
-  android::linkerconfig::contents::RegisterApexNamespaceBuilders(ctx);
+  if (!args.is_recovery) {
+    auto apex_list = android::linkerconfig::modules::ScanActiveApexes(args.root);
+    for (auto const& apex_item : apex_list) {
+      auto apex_info = apex_item.second;
+      if (apex_info.has_bin || apex_info.has_lib) {
+        ctx.AddApexModule(std::move(apex_info));
+      }
+    }
+    android::linkerconfig::contents::RegisterApexNamespaceBuilders(ctx);
+  }
   return ctx;
 }
 
@@ -212,7 +214,8 @@ Configuration GetConfiguration(Context& ctx) {
   return android::linkerconfig::contents::CreateBaseConfiguration(ctx);
 }
 
-Result<void> GenerateConfiguration(Configuration config, std::string dir_path,
+Result<void> GenerateConfiguration(Configuration config,
+                                   const std::string& dir_path,
                                    bool update_permission) {
   std::string file_path = "";
   if (dir_path != "") {
@@ -267,16 +270,20 @@ void GenerateApexConfigurations(Context& ctx, const std::string& dir_path) {
   }
 }
 
-void GenerateJniConfig(Context& ctx, const std::string& dir_path) {
+void GenerateApexLibrariesConfig(Context& ctx, const std::string& dir_path) {
   if (dir_path == "") {
     return;
   }
-  std::string file_path = dir_path + "/jni.config.txt";
+  const std::string file_path = dir_path + "/apex.libraries.config.txt";
   std::ofstream out(file_path);
   for (auto const& apex_item : ctx.GetApexModules()) {
     if (!apex_item.jni_libs.empty()) {
-      out << apex_item.namespace_name << " " << Join(apex_item.jni_libs, ":")
-          << '\n';
+      out << "jni " << apex_item.namespace_name << " "
+          << Join(apex_item.jni_libs, ":") << '\n';
+    }
+    if (!apex_item.public_libs.empty()) {
+      out << "public " << apex_item.namespace_name << " "
+          << Join(apex_item.public_libs, ":") << '\n';
     }
   }
   out.close();
@@ -338,7 +345,7 @@ int main(int argc, char* argv[]) {
   } else {
     ExitOnFailure(GenerateBaseLinkerConfiguration(ctx, args.target_directory));
     GenerateApexConfigurations(ctx, args.target_directory);
-    GenerateJniConfig(ctx, args.target_directory);
+    GenerateApexLibrariesConfig(ctx, args.target_directory);
   }
 
   return EXIT_SUCCESS;
