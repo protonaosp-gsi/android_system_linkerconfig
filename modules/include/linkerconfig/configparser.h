@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include "linkerconfig/context.h"
-#include "linkerconfig/namespace.h"
-#include "linkerconfig/section.h"
+#include <android-base/result.h>
+#include <linker_config.pb.h>
 
 namespace android {
 namespace linkerconfig {
-namespace contents {
-
-// Adds links from all namespaces in the given section to the namespace for
-// /system/${LIB} for standard libraries like Bionic (libc.so, libm.so,
-// libdl.so) and applicable libclang_rt.*.
-void AddStandardSystemLinks(const Context& ctx, modules::Section* section);
-}  // namespace contents
+namespace modules {
+android::base::Result<android::linkerconfig::proto::LinkerConfig>
+ParseLinkerConfig(const std::string& config_path);
+}  // namespace modules
 }  // namespace linkerconfig
 }  // namespace android

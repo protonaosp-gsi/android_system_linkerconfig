@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include <android-base/result.h>
+
 namespace android {
 namespace linkerconfig {
 namespace modules {
@@ -36,6 +38,7 @@ struct ApexInfo {
   bool has_bin;
   bool has_lib;
   bool visible;
+  bool has_shared_lib;
 
   ApexInfo() = default;  // for std::map::operator[]
   ApexInfo(std::string name, std::string path,
@@ -43,7 +46,7 @@ struct ApexInfo {
            std::vector<std::string> require_libs,
            std::vector<std::string> jni_libs,
            std::vector<std::string> permitted_paths, bool has_bin, bool has_lib,
-           bool visible)
+           bool visible, bool has_shared_lib)
       : name(std::move(name)),
         path(std::move(path)),
         provide_libs(std::move(provide_libs)),
@@ -52,7 +55,8 @@ struct ApexInfo {
         permitted_paths(std::move(permitted_paths)),
         has_bin(has_bin),
         has_lib(has_lib),
-        visible(visible) {
+        visible(visible),
+        has_shared_lib(has_shared_lib) {
     this->namespace_name = this->name;
     std::replace(
         this->namespace_name.begin(), this->namespace_name.end(), '.', '_');
@@ -63,7 +67,8 @@ struct ApexInfo {
   bool InVendor() const;
 };
 
-std::map<std::string, ApexInfo> ScanActiveApexes(const std::string& root);
+android::base::Result<std::map<std::string, ApexInfo>> ScanActiveApexes(
+    const std::string& root);
 }  // namespace modules
 }  // namespace linkerconfig
 }  // namespace android

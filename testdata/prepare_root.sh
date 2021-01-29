@@ -93,6 +93,10 @@ mkdir -p $ROOT_OUT
 mkdir -p $ROOT_OUT/apex
 cp -R $ROOT_IN/* $ROOT_OUT
 
+if test -f $ROOT_OUT/system/etc/linker.config.json; then
+  conv_linker_config proto -s $ROOT_OUT/system/etc/linker.config.json -o $ROOT_OUT/system/etc/linker.config.pb
+fi
+
 apexInfo=$ROOT_OUT/apex/apex-info-list.xml
 echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>" > $apexInfo
 echo "<apex-info-list>" > $apexInfo
@@ -107,6 +111,9 @@ for partition in system product system_ext vendor; do
       if [ $(get_level $name) -le $activate_level ]; then
         cp -r $src $dst
         conv_apex_manifest proto $dst/apex_manifest.json -o $dst/apex_manifest.pb
+        if test -f $dst/etc/linker.config.json; then
+          conv_linker_config proto -s $dst/etc/linker.config.json -o $dst/etc/linker.config.pb
+        fi
         mkdir $dst/lib
         echo " <apex-info moduleName=\"$name\" modulePath=\"$module_path\" preinstalledModulePath=\"$preinstalled_path\" isFactory=\"true\" isActive=\"true\" />" >> $apexInfo
       else

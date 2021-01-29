@@ -33,6 +33,7 @@
 #include "linkerconfig/apex.h"
 #include "linkerconfig/apexconfig.h"
 #include "linkerconfig/baseconfig.h"
+#include "linkerconfig/configparser.h"
 #include "linkerconfig/context.h"
 #include "linkerconfig/environment.h"
 #include "linkerconfig/legacy.h"
@@ -190,13 +191,28 @@ Context GetContext(ProgramArgs args) {
   }
   if (!args.is_recovery) {
     auto apex_list = android::linkerconfig::modules::ScanActiveApexes(args.root);
-    for (auto const& apex_item : apex_list) {
-      auto apex_info = apex_item.second;
-      if (apex_info.has_bin || apex_info.has_lib) {
-        ctx.AddApexModule(std::move(apex_info));
+    if (apex_list.ok()) {
+      for (auto const& apex_item : *apex_list) {
+        auto apex_info = apex_item.second;
+        if (apex_info.has_bin || apex_info.has_lib) {
+          ctx.AddApexModule(std::move(apex_info));
+        }
       }
+    } else {
+      LOG(ERROR) << "Failed to scan APEX modules : " << apex_list.error();
     }
     android::linkerconfig::contents::RegisterApexNamespaceBuilders(ctx);
+  }
+
+  std::string system_config_path = args.root + "/system/etc/linker.config.pb";
+  if (access(system_config_path.c_str(), F_OK) == 0) {
+    auto system_config =
+        android::linkerconfig::modules::ParseLinkerConfig(system_config_path);
+    if (system_config.ok()) {
+      ctx.SetSystemConfig(*system_config);
+    } else {
+      LOG(ERROR) << "Failed to read system config : " << system_config.error();
+    }
   }
   return ctx;
 }

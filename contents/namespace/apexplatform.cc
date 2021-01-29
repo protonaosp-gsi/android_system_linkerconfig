@@ -27,33 +27,6 @@ using android::linkerconfig::modules::ApexInfo;
 using android::linkerconfig::modules::IsProductVndkVersionDefined;
 using android::linkerconfig::modules::Namespace;
 
-namespace {
-std::vector<std::string> required_libs = {
-    "libandroidicu.so",
-    "libdexfile_external.so",
-    "libdexfiled_external.so",
-    "libicu.so",
-    // TODO(b/120786417 or b/134659294): libicuuc.so and libicui18n.so are kept
-    // for app compat. Uncomment those once they are marked as provided from ART
-    // APEX.
-
-    // "libicui18n.so",
-    // "libicuuc.so",
-    "libnativebridge.so",
-    "libnativehelper.so",
-    "libnativeloader.so",
-    // TODO(b/122876336): Remove libpac.so once it's migrated to Webview
-    "libpac.so",
-    // statsd
-    "libstatspull.so",
-    "libstatssocket.so",
-    // adbd
-    "libadb_pairing_auth.so",
-    "libadb_pairing_connection.so",
-    "libadb_pairing_server.so",
-};
-}  // namespace
-
 namespace android {
 namespace linkerconfig {
 namespace contents {
@@ -67,8 +40,8 @@ Namespace BuildApexPlatformNamespace([[maybe_unused]] const Context& ctx) {
   }
   ns.AddPermittedPath("/apex/com.android.runtime/${LIB}/bionic");
 
-  ns.AddProvides(GetSystemStubLibraries());
-  ns.AddRequires(required_libs);
+  ns.AddProvides(ctx.GetSystemProvideLibs());
+  ns.AddRequires(ctx.GetSystemRequireLibs());
 
   return ns;
 }

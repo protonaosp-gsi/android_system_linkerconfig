@@ -14,21 +14,37 @@
  * limitations under the License.
  */
 
-#include <string>
-#include <vector>
+#include "linkerconfig/configparser.h"
 
-#include <android-base/result.h>
+#include <android-base/file.h>
+#include <android-base/strings.h>
+#include <linker_config.pb.h>
+
+#include "linkerconfig/log.h"
+
+using android::base::ReadFileToString;
+using android::base::Result;
+using ::android::linkerconfig::proto::LinkerConfig;
 
 namespace android {
 namespace linkerconfig {
 namespace modules {
-struct ApexLinkerConfig {
-  std::vector<std::string> permitted_paths;
-  bool visible;
-};
 
-android::base::Result<ApexLinkerConfig> ParseApexLinkerConfig(
-    const std::string& config_path);
+// Format of the file can be found from README.md file
+Result<LinkerConfig> ParseLinkerConfig(const std::string& config_path) {
+  std::string file_content;
+
+  if (!ReadFileToString(config_path, &file_content)) {
+    return ErrnoErrorf("Cannot read file {}", config_path);
+  }
+
+  LinkerConfig config;
+  if (!config.ParseFromString(file_content)) {
+    return Errorf("Failed to parse file {}", config_path);
+  }
+  return config;
+}
+
 }  // namespace modules
 }  // namespace linkerconfig
 }  // namespace android
