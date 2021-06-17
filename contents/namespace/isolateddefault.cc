@@ -16,14 +16,21 @@
 
 #include "linkerconfig/namespacebuilder.h"
 
+#include "linkerconfig/common.h"
+#include "linkerconfig/namespace.h"
+
+using android::linkerconfig::modules::Namespace;
+
 namespace android {
 namespace linkerconfig {
 namespace contents {
+Namespace BuildIsolatedDefaultNamespace([[maybe_unused]] const Context& ctx) {
+  Namespace ns("default", /*is_isolated=*/true, /*is_visible=*/false);
 
-void RegisterApexNamespaceBuilders(Context& ctx) {
-  ctx.RegisterApexNamespaceBuilder("com.android.art", BuildArtNamespace);
+  ns.GetLink(ctx.GetSystemNamespaceName()).AllowAllSharedLibs();
+
+  return ns;
 }
-
 }  // namespace contents
 }  // namespace linkerconfig
 }  // namespace android

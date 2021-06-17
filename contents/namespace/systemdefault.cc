@@ -22,7 +22,6 @@
 #include "linkerconfig/namespace.h"
 #include "linkerconfig/namespacebuilder.h"
 
-using android::linkerconfig::modules::AsanPath;
 using android::linkerconfig::modules::IsProductVndkVersionDefined;
 using android::linkerconfig::modules::Namespace;
 
@@ -40,16 +39,16 @@ Namespace BuildSystemDefaultNamespace([[maybe_unused]] const Context& ctx) {
                /*is_isolated=*/is_fully_treblelized,
                /*is_visible=*/true);
 
-  ns.AddSearchPath("/system/${LIB}", AsanPath::WITH_DATA_ASAN);
-  ns.AddSearchPath(system_ext + "/${LIB}", AsanPath::WITH_DATA_ASAN);
+  ns.AddSearchPath("/system/${LIB}");
+  ns.AddSearchPath(system_ext + "/${LIB}");
   if (!IsProductVndkVersionDefined() || !is_fully_treblelized) {
     // System processes can search product libs only if product VNDK is not
     // enforced.
-    ns.AddSearchPath(product + "/${LIB}", AsanPath::WITH_DATA_ASAN);
+    ns.AddSearchPath(product + "/${LIB}");
   }
   if (!is_fully_treblelized) {
-    ns.AddSearchPath("/vendor/${LIB}", AsanPath::WITH_DATA_ASAN);
-    ns.AddSearchPath("/odm/${LIB}", AsanPath::WITH_DATA_ASAN);
+    ns.AddSearchPath("/vendor/${LIB}");
+    ns.AddSearchPath("/odm/${LIB}");
   }
 
   if (is_fully_treblelized) {
@@ -94,42 +93,16 @@ Namespace BuildSystemDefaultNamespace([[maybe_unused]] const Context& ctx) {
         "/system/${LIB}/bootstrap"};
 
     for (const auto& path : permitted_paths) {
-      ns.AddPermittedPath(path, AsanPath::SAME_PATH);
+      ns.AddPermittedPath(path);
     }
     if (!IsProductVndkVersionDefined()) {
       // System processes can use product libs only if product VNDK is not enforced.
-      ns.AddPermittedPath(product + "/${LIB}", AsanPath::SAME_PATH);
+      ns.AddPermittedPath(product + "/${LIB}");
     }
   }
 
-  ns.AddRequires(std::vector{
-      // Keep in sync with the "platform" namespace in art/build/apex/ld.config.txt.
-      "libdexfile_external.so",
-      "libdexfiled_external.so",
-      "libnativebridge.so",
-      "libnativehelper.so",
-      "libnativeloader.so",
-      "libandroidicu.so",
-      // TODO(b/122876336): Remove libpac.so once it's migrated to Webview
-      "libpac.so",
-      // TODO(b/120786417 or b/134659294): libicuuc.so
-      // and libicui18n.so are kept for app compat.
-      "libicui18n.so",
-      "libicuuc.so",
-      // resolv
-      "libnetd_resolv.so",
-      // nn
-      "libneuralnetworks.so",
-      // statsd
-      "libstatspull.so",
-      "libstatssocket.so",
-      // adbd
-      "libadb_pairing_auth.so",
-      "libadb_pairing_connection.so",
-      "libadb_pairing_server.so",
-  });
-
-  ns.AddProvides(GetSystemStubLibraries());
+  ns.AddRequires(ctx.GetSystemRequireLibs());
+  ns.AddProvides(ctx.GetSystemProvideLibs());
   return ns;
 }
 }  // namespace contents
