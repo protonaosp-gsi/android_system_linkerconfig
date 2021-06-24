@@ -51,7 +51,9 @@ Namespace BuildVendorDefaultNamespace([[maybe_unused]] const Context& ctx) {
   }
 
   ns.AddRequires(std::vector{"libneuralnetworks.so"});
-  ns.AddRequires(std::vector{"libneuralnetworks_shim.so"});
+  ns.AddRequires(ctx.GetVendorRequireLibs());
+  ns.AddProvides(ctx.GetVendorProvideLibs());
+
   return ns;
 }
 }  // namespace contents

@@ -201,7 +201,6 @@ Context GetContext(ProgramArgs args) {
     } else {
       LOG(ERROR) << "Failed to scan APEX modules : " << apex_list.error();
     }
-    android::linkerconfig::contents::RegisterApexNamespaceBuilders(ctx);
   }
 
   std::string system_config_path = args.root + "/system/etc/linker.config.pb";
@@ -212,6 +211,28 @@ Context GetContext(ProgramArgs args) {
       ctx.SetSystemConfig(*system_config);
     } else {
       LOG(ERROR) << "Failed to read system config : " << system_config.error();
+    }
+  }
+
+  std::string vendor_config_path = args.root + "/vendor/etc/linker.config.pb";
+  if (access(vendor_config_path.c_str(), F_OK) == 0) {
+    auto vendor_config =
+        android::linkerconfig::modules::ParseLinkerConfig(vendor_config_path);
+    if (vendor_config.ok()) {
+      ctx.SetVendorConfig(*vendor_config);
+    } else {
+      LOG(ERROR) << "Failed to read vendor config : " << vendor_config.error();
+    }
+  }
+
+  std::string product_config_path = args.root + "/product/etc/linker.config.pb";
+  if (access(product_config_path.c_str(), F_OK) == 0) {
+    auto product_config =
+        android::linkerconfig::modules::ParseLinkerConfig(product_config_path);
+    if (product_config.ok()) {
+      ctx.SetProductConfig(*product_config);
+    } else {
+      LOG(ERROR) << "Failed to read product config : " << product_config.error();
     }
   }
   return ctx;
